@@ -41,6 +41,7 @@ public class PhysicalWebCollection {
   private Map<String, byte[]> mIconUrlToIconMap;
   private Set<String> mPendingBroadcastUrls;
   private Set<String> mPendingIconUrls;
+  private Set<String> mFailedResolveUrls;
 
   /**
    * Construct a PhysicalWebCollection.
@@ -52,14 +53,18 @@ public class PhysicalWebCollection {
     mIconUrlToIconMap = new HashMap<>();
     mPendingBroadcastUrls = new HashSet<>();
     mPendingIconUrls = new HashSet<>();
+    mFailedResolveUrls = new HashSet<>();
   }
 
   /**
    * Add a UrlDevice to the collection.
    * @param urlDevice The UrlDevice to add.
+   * @return true if the device already existed in the map
    */
-  public void addUrlDevice(UrlDevice urlDevice) {
+  public boolean addUrlDevice(UrlDevice urlDevice) {
+    boolean alreadyFound = mDeviceIdToUrlDeviceMap.containsKey(urlDevice.getId());
     mDeviceIdToUrlDeviceMap.put(urlDevice.getId(), urlDevice);
+    return alreadyFound;
   }
 
   /**
@@ -291,11 +296,22 @@ public class PhysicalWebCollection {
   }
 
   /**
-   * Set the URL for making PWS requests.
+   * Set the URL, the API version, the API Key for making PWS requests.
    * @param pwsEndpoint The new PWS endpoint.
+   * @param pwsApiVersion The new PWS API version.
    */
-  public void setPwsEndpoint(String pwsEndpoint) {
-    mPwsClient.setPwsEndpoint(pwsEndpoint);
+  public void setPwsEndpoint(String pwsEndpoint, int pwsApiVersion) {
+    mPwsClient.setEndpoint(pwsEndpoint, pwsApiVersion);
+  }
+
+  /**
+   * Set the URL, the API version, the API Key for making PWS requests.
+   * @param pwsEndpoint The new PWS endpoint.
+   * @param pwsApiVersion The new PWS API version.
+   * @param pwsApiKey The new PWS API key.
+   */
+  public void setPwsEndpoint(String pwsEndpoint, int pwsApiVersion, String pwsApiKey) {
+    mPwsClient.setEndpoint(pwsEndpoint, pwsApiVersion, pwsApiKey);
   }
 
   private class AugmentedPwsResultIconCallback extends PwsResultIconCallback {
@@ -337,7 +353,7 @@ public class PhysicalWebCollection {
     Set<String> newIconUrls = new HashSet<>();
     for (UrlDevice urlDevice : mDeviceIdToUrlDeviceMap.values()) {
       String url = urlDevice.getUrl();
-      if (!mPendingBroadcastUrls.contains(url)) {
+      if (!mPendingBroadcastUrls.contains(url) && !mFailedResolveUrls.contains(url)) {
         PwsResult pwsResult = mBroadcastUrlToPwsResultMap.get(url);
         if (pwsResult == null) {
           newResolveUrls.add(url);
@@ -367,6 +383,7 @@ public class PhysicalWebCollection {
 
       @Override
       public void onPwsResultAbsent(String url) {
+        mFailedResolveUrls.add(url);
         pwsResultCallback.onPwsResultAbsent(url);
       }
 
